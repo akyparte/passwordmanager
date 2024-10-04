@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import CryptoJS from "crypto-js";
+import { v4 as uuidv4 } from 'uuid';
+import { styles } from "./index.styles";
 
 const SecurePasswordManager: React.FC = () => {
   const [encryptionKey, setEncryptionKey] = useState<string>("");
@@ -8,7 +10,7 @@ const SecurePasswordManager: React.FC = () => {
   const [id, setId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [passwords, setPasswords] = useState<{ id: string; password: string; description: string }[]>([]);
+  const [passwords, setPasswords] = useState<{ id: string; password: string; description: string; uniqueId: string }[]>([]);
   const [keyError, setKeyError] = useState<string>("");
   const [theme, setTheme] = useState<string>("light");
 
@@ -70,7 +72,7 @@ const SecurePasswordManager: React.FC = () => {
       const encryptedPassword = CryptoJS.AES.encrypt(password, encryptionKey).toString();
       const encryptedDescription = CryptoJS.AES.encrypt(description, encryptionKey).toString();
 
-      const newPasswords = [...passwords, { id: encryptedId, password: encryptedPassword, description: encryptedDescription }];
+      const newPasswords = [...passwords, { id: encryptedId, password: encryptedPassword, description: encryptedDescription,  uniqueId: uuidv4(), }];
       setPasswords(newPasswords);
       setId("");
       setPassword("");
@@ -78,6 +80,51 @@ const SecurePasswordManager: React.FC = () => {
     } else {
       alert("Please enter ID, password, and description.");
     }
+  };
+
+  const backupPasswords = () => {
+    const jsonPasswords = JSON.stringify(passwords);
+    const blob = new Blob([jsonPasswords], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "passwords_backup.json";
+    link.click();
+  };
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // const RestoreComponent = () => {
+  
+    const handleFileSelect = () => {
+      // Programmatically click the hidden input element when the button is clicked
+      fileInputRef.current?.click();
+    };
+  
+    const restorePasswords = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const restoredPasswords = JSON.parse(e.target?.result as string);
+          const updatedPasswords = [...passwords]; // Your current state
+  
+          restoredPasswords.forEach((restoredPassword: { id: string; password: string; description: string; uniqueId: string }) => {
+            // Avoid duplicates by checking uniqueId
+            if (!updatedPasswords.some(p => p.uniqueId === restoredPassword.uniqueId)) {
+              updatedPasswords.push(restoredPassword);
+            }
+          });
+  
+          setPasswords(updatedPasswords);
+        };
+        reader.readAsText(file);
+      }
+    };
+
+  // }
+
+  const deletePassword = (index: number) => {
+    const updatedPasswords = passwords.filter((_, i) => i !== index);
+    setPasswords(updatedPasswords);
   };
 
   const togglePassword = (index: number, encryptedId: string, encryptedPassword: string, encryptedDescription: string) => {
@@ -115,6 +162,7 @@ const SecurePasswordManager: React.FC = () => {
       <div style={theme === "light" ? styles.lightContainer : styles.darkContainer} id="container">
         <h2 style={styles.title}>Secure Password Manager</h2>
 
+       
         <button onClick={toggleTheme} style={styles.themeToggleButton}>
           {theme === "light" ? "Dark Mode" : "Light Mode"}
         </button>
@@ -186,7 +234,18 @@ const SecurePasswordManager: React.FC = () => {
             <button onClick={savePassword} style={styles.button}>Save Credentials</button>
 
             <div style={styles.passwordList}>
+              <div style={styles.savedPasswordBars}> 
               <h3>Saved Passwords</h3>
+              <input
+              type="file"
+              ref={fileInputRef}
+              onChange={restorePasswords}
+              style={{ display: 'none' }} // Hide the input
+              />
+              <button onClick={backupPasswords} style={styles.backupPasswordButton} >Backup</button>
+              <button onClick={handleFileSelect} style={styles.backupPasswordButton} >Restore</button>
+              </div>
+             
               <ul style={styles.list}>
                 {passwords.map((entry, index) => (
                   <li key={index} style={styles.listItem}>
@@ -195,6 +254,9 @@ const SecurePasswordManager: React.FC = () => {
                     Description: <span id={`desc-${index}`}>********</span><br />
                     <button onClick={() => togglePassword(index, entry.id, entry.password, entry.description)} style={styles.toggleButton}>
                       Show/Hide Credentials
+                    </button>
+                    <button onClick={() => deletePassword(index)} style={styles.deleteButton}>
+                      Delete
                     </button>
                   </li>
                 ))}
@@ -205,152 +267,6 @@ const SecurePasswordManager: React.FC = () => {
       </div>
     </div>
   );
-};
-
-// Base styles remain unchanged...
-
-
-// Base styles common to both light and dark themes
-const baseStyles: { [key: string]: React.CSSProperties } = {
-  container: {
-    margin: "20px",
-    fontFamily: "'Arial', sans-serif",
-    borderRadius: "8px",
-    padding: "20px",
-    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-    // border: '2px solid black',
-    position: "relative",
-
-  },
-  mainBody: {
-    border: '0.1px solid black',
-      width: '100%',
-      minHeight: '100vh',
-      // position: 'relative',
-  },
-  title: {
-    textAlign: "center",
-    marginBottom: '20px',
-    marginTop: '35px'
-  },
-  formContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    width: "100%",
-  },
-  inputGroup: {
-    marginBottom: "15px",
-    width: "100%",
-  },
-  input: {
-    padding: "10px",
-    width: "100%",
-    borderRadius: "4px",
-    border: "1px solid #ccc",
-    fontSize: "16px",
-    outline: "none",
-  },
-  button: {
-    padding: "10px 15px",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "16px",
-  },
-  toggleButton: {
-    marginTop: "10px",
-    padding: "5px 10px",
-    backgroundColor: "#28a745",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "14px",
-    // position: "absolute",
-  },
-  themeToggleButton: {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    padding: "10px",
-    border: "none",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    borderRadius: "4px",
-    cursor: "pointer",
-  },
-  errorMessage: {
-    color: "red",
-    fontSize: "14px",
-    marginTop: "10px",
-    textAlign: "center",
-  },
-  // listItem: {
-  //   border: "1px solid #ccc",
-  //   padding: '6px'
-  // },
-
-  listItem: {
-    padding: "10px",
-    border: "1px solid #ccc",
-    marginBottom: "5px",
-    borderRadius: "4px",
-    listStyleType: "none"
-  },
-  passwordList: {
-    marginTop: "20px",
-  },
-
-  list: {
-    listStyleType: "none",
-    marginBottom:3,
-  },
-};
-
-// Light and dark theme specific styles
-const styles = {
-  lightContainer: {
-    ...baseStyles.container,
-    backgroundColor: "#fff",
-    color: "#000",
-  },
-  darkContainer: {
-    ...baseStyles.container,
-    backgroundColor: "#333",
-    color: "#fff",
-  },
-  lightMainBody: {
-    ...baseStyles.mainBody,
-    backgroundColor: "#fff",
-
-  },
-  darkMainBody: {
-    ...baseStyles.mainBody,
-    backgroundColor: "#121212",
-      
-  },
-  title: baseStyles.title,
-  formContainer: baseStyles.formContainer,
-  inputGroup: baseStyles.inputGroup,
-  inputLight: {
-    ...baseStyles.input,
-    backgroundColor: '#fff',
-  },
-  inputDark: {
-    ...baseStyles.input,
-    backgroundColor: '#D3D3D3',
-  },
-  themeToggleButton: baseStyles.themeToggleButton,
-  button: baseStyles.button,
-  toggleButton: baseStyles.toggleButton,
-  errorMessage: baseStyles.errorMessage, 
-  passwordSection: baseStyles.passwordSection,
-  passwordList: baseStyles.passwordList,
-  list: baseStyles.list,
-  listItem: baseStyles.listItem,
 };
 
 
