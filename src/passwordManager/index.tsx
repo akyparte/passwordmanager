@@ -10,7 +10,7 @@ const SecurePasswordManager: React.FC = () => {
   const [id, setId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [passwords, setPasswords] = useState<{ id: string; password: string; description: string; uniqueId: string }[]>([]);
+  const [passwords, setPasswords] = useState<{ id: string; password: string; description: string; }[]>([]);
   const [keyError, setKeyError] = useState<string>("");
   const [theme, setTheme] = useState<string>("light");
 
@@ -72,7 +72,7 @@ const SecurePasswordManager: React.FC = () => {
       const encryptedPassword = CryptoJS.AES.encrypt(password, encryptionKey).toString();
       const encryptedDescription = CryptoJS.AES.encrypt(description, encryptionKey).toString();
 
-      const newPasswords = [...passwords, { id: encryptedId, password: encryptedPassword, description: encryptedDescription,  uniqueId: uuidv4(), }];
+      const newPasswords = [...passwords, { id: encryptedId, password: encryptedPassword, description: encryptedDescription }];
       setPasswords(newPasswords);
       setId("");
       setPassword("");
@@ -92,45 +92,44 @@ const SecurePasswordManager: React.FC = () => {
   };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // const RestoreComponent = () => {
-  
-    const handleFileSelect = () => {
-      // Programmatically click the hidden input element when the button is clicked
-      fileInputRef.current?.click();
-    };
-  
-    const restorePasswords = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const restoredPasswords = JSON.parse(e.target?.result as string);
-          const updatedPasswords = [...passwords]; // Your current state
-  
-          restoredPasswords.forEach((restoredPassword: { id: string; password: string; description: string; uniqueId: string }) => {
-            // Avoid duplicates by checking uniqueId
-            if (!updatedPasswords.some(p => p.uniqueId === restoredPassword.uniqueId)) {
-              updatedPasswords.push(restoredPassword);
-            }
-          });
-  
-          setPasswords(updatedPasswords);
-        };
-        reader.readAsText(file);
-      }
-    };
 
-  // }
-
-  const deletePassword = (index: number) => {
-    const updatedPasswords = passwords.filter((_, i) => i !== index);
-    setPasswords(updatedPasswords);
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
   };
 
-  const togglePassword = (index: number, encryptedId: string, encryptedPassword: string, encryptedDescription: string) => {
-    const idElement = document.getElementById(`id-${index}`);
-    const passElement = document.getElementById(`pass-${index}`);
-    const descriptionElement = document.getElementById(`desc-${index}`);
+  const restorePasswords = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    console.log('file',file)
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const restoredPasswords = JSON.parse(e.target?.result as string);
+        const updatedPasswords = [...passwords];
+
+        restoredPasswords.forEach((restoredPassword: { id: string; password: string; description: string }) => {
+          if (!updatedPasswords.some(p => p.id === restoredPassword.id)) {
+            updatedPasswords.push(restoredPassword);
+          }
+        });
+
+        setPasswords(updatedPasswords);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const deletePassword = (encryptedId: string) => {
+    const updatedPasswords = passwords.filter(password => password.id !== encryptedId);
+    setPasswords([...updatedPasswords]);
+  };
+
+  const togglePassword = (encryptedId: string, encryptedPassword: string, encryptedDescription: string) => {
+    const idElement = document.getElementById(`id-${encryptedId}`);
+    const passElement = document.getElementById(`pass-${encryptedId}`);
+    const descriptionElement = document.getElementById(`desc-${encryptedId}`);
 
     if (idElement?.textContent === "********" && passElement?.textContent === "********" && descriptionElement?.textContent === "********") {
       try {
@@ -223,9 +222,9 @@ const SecurePasswordManager: React.FC = () => {
             <div style={styles.inputGroup}>
               <label htmlFor="description">Description:</label>
               <input
-                type="input"
+                type="text"
                 id="description"
-                placeholder="Add description"
+                placeholder="Enter a description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 style={theme === "light" ? styles.inputLight : styles.inputDark}
@@ -247,15 +246,15 @@ const SecurePasswordManager: React.FC = () => {
               </div>
              
               <ul style={styles.list}>
-                {passwords.map((entry, index) => (
-                  <li key={index} style={styles.listItem}>
-                    ID: <span id={`id-${index}`}>********</span><br />
-                    Password: <span id={`pass-${index}`}>********</span><br />
-                    Description: <span id={`desc-${index}`}>********</span><br />
-                    <button onClick={() => togglePassword(index, entry.id, entry.password, entry.description)} style={styles.toggleButton}>
+                {passwords.map((entry) => (
+                  <li key={entry.id} style={styles.listItem}>
+                    ID: <span id={`id-${entry.id}`}>********</span><br />
+                    Password: <span id={`pass-${entry.id}`}>********</span><br />
+                    Description: <span id={`desc-${entry.id}`}>********</span><br />
+                    <button onClick={() => togglePassword(entry.id, entry.password, entry.description)} style={styles.toggleButton}>
                       Show/Hide Credentials
                     </button>
-                    <button onClick={() => deletePassword(index)} style={styles.deleteButton}>
+                    <button onClick={() => deletePassword(entry.id)} style={styles.deleteButton}>
                       Delete
                     </button>
                   </li>
