@@ -99,27 +99,54 @@ const SecurePasswordManager: React.FC = () => {
 
   const restorePasswords = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    console.log('file',file)
     if (file) {
+      // Check if the file type is JSON
+      if (file.type !== "application/json") {
+        alert("Invalid file type");
+        return;
+      }
+  
       const reader = new FileReader();
       reader.onload = (e) => {
-        const restoredPasswords = JSON.parse(e.target?.result as string);
-        const updatedPasswords = [...passwords];
-
-        restoredPasswords.forEach((restoredPassword: { id: string; password: string; description: string }) => {
-          if (!updatedPasswords.some(p => p.id === restoredPassword.id)) {
-            updatedPasswords.push(restoredPassword);
+        try {
+          // Parse the JSON
+          const restoredPasswords = JSON.parse(e.target?.result as string);
+  
+          // Validate if parsed object has the correct structure
+          if (!Array.isArray(restoredPasswords) || !restoredPasswords.every((item) => item.id && item.password && item.description)) {
+            throw new Error("Invalid backup structure.");
           }
-        });
-
-        setPasswords(updatedPasswords);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+  
+          const updatedPasswords = [...passwords];
+          restoredPasswords.forEach((restoredPassword: { id: string; password: string; description: string }) => {
+            try {
+              // Attempt to decrypt one entry to validate the encryption key
+              CryptoJS.AES.decrypt(restoredPassword.password, encryptionKey).toString(CryptoJS.enc.Utf8);
+  
+              if (!updatedPasswords.some(p => p.id === restoredPassword.id)) {
+                updatedPasswords.push(restoredPassword);
+              }
+            } catch (error) {
+              throw new Error("Decryption failed. Invalid encryption key or corrupted data.");
+            }
+          });
+  
+          setPasswords(updatedPasswords);
+          // Clear file input value to allow re-upload
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        } catch (error : any) {
+          alert("Invalid backup file");
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
         }
       };
       reader.readAsText(file);
     }
   };
+  
 
   const deletePassword = (encryptedId: string) => {
     const updatedPasswords = passwords.filter(password => password.id !== encryptedId);
